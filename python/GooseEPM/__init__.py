@@ -59,3 +59,17 @@ def elshelby_propagator(L: int, imposed="strain") -> np.ndarray:
             G[0, 0] = -1
 
     return G, dx, dx
+
+
+def laplace_propagator() -> np.ndarray:
+    """
+    Short range Laplace propagator for imposed stress simulations.
+
+    :return: ``(propagator, dx, dy)``
+    """
+
+    d = 0.25
+    G = np.array([[0, d, 0], [d, -1, d], [0, d, 0]])
+    dx = np.array([-1, 0, 1])
+
+    return G, dx, dx

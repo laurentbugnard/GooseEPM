@@ -8,7 +8,6 @@ faulthandler.enable()
 
 class Test_version(unittest.TestCase):
     def test_version_dependencies(self):
-
         deps = version_dependencies()
         deps = [i.split("=")[0] for i in deps]
 
@@ -21,5 +20,4 @@ class Test_version(unittest.TestCase):
 
 
 if __name__ == "__main__":
-
     unittest.main(verbosity=2)

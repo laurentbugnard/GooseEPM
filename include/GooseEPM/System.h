@@ -164,21 +164,38 @@ inline T reorganise_popagator(const T& propagator, const D& drow, const D& dcol)
  *
  * **Imposed stress**:
  *
- *  -   The propagator \f$ G_{ij} \f$ must follow \f$ \sum\limits_{ij} G_{ij} = 0 \f$ and
- *      \f$ G(\Delta i = 0, \Delta j = 0) = -1 \f$.
+ *  -   The propagator \f$ G \f$ must follow \f$ \sum\limits_{i = 1}^N G_i = 0 \f$ and
+ *      \f$ G(\Delta x = 0, \Delta y = 0) = -1 \f$.
  *      See SystemAthermal::propogator_follows_conventions.
  *
- * @note The average stress is not fixed internally. Consequently, numerical errors may accumulate.
+ * @note The average stress is not strictly fixed internally.
+ * Instead the average stress is simply not changed by the relaxation and the stress redistribution.
+ * Consequently, numerical errors may accumulate.
  * Use SystemAthermal::set_sigmabar to correct if needed.
  *
  * **Imposed strain**:
  *
- *  -   The propagator \f$ G_{ij} \f$ must follow \f$ \sum\limits_{ij} G_{ij} = - 1 / N \f$,
- *      with \f$ N \f$ the size of the propagator, and \f$ G(\Delta i = 0, \Delta j = 0) = -1 \f$.
+ *  -   The average strain
+ *      \f$ \bar{\epsilon}(t) \equiv 1 / N \sum\limits_{i = 1}^N \varepsilon_i (t) \f$
+ *      is fixed during relaxation.
+ *      Consequently, for each single relaxation, during a time interval \f$ \Delta t \f$,
+ *      \f$ \bar{\epsilon}(t + \Delta t) = \bar{\epsilon}(t) \f$.
+ *      The strain of each block
+ *      \f$ \varepsilon_i (t) = \varepsilon^p_i (t) + \sigma_i (t) / \mu \f$, with
+ *      \f$ \varepsilon^p_i \f$ the plastic strain and the shear modulus \f$ \mu \equiv 1 \f$.
+ *      For each individual relaxation, the plastic strain increment is non-zero only in the failing
+ *      block \f$ f \f$ and equal to
+ *      \f$ \Delta \varepsilon^p_f = G(\Delta x = 0, \Delta y = 0) \sigma_f / \mu \f$.
+ *      Since \f$ \sum\limits_{i = 1}^N \Delta \varepsilon_i = 0 \f$ it not now easy to find that
+ *      \f$ G(\Delta x = 0, \Delta y = 0) = \sum\limits_{i = 1}^N G_i \f$.
+ *
+ *  -   The propagator \f$ G \f$ must thus follow that \f$ \sum\limits_{i = 1}^N G_i = -1 \f$,
+ *      with \f$ G(\Delta x = 0, \Delta y = 0) = -1 \f$.
  *      See SystemAthermal::propogator_follows_conventions.
  *
- *  -   Driving proceeds by imposing the strain, that changes the stress through elasticity.
- *      To change the strain such that that the system just reaches the next yielding event,
+ *  -   Through this convention the strain is fixed during relaxation and stress redistribution.
+ *
+ *  -   To change the strain such that that the system just reaches the next yielding event,
  *      use SystemAthermal::shiftImposedShear.
  *
  * **Initialization**:
@@ -315,11 +332,10 @@ public:
         }
 
         if (protocol == "stress") {
-            return xt::allclose(xt::mean(m_propagator), 0.0);
+            return xt::allclose(xt::sum(m_propagator), 0.0);
         }
         else if (protocol == "strain") {
-            return xt::allclose(
-                xt::mean(m_propagator), -1.0 / static_cast<double>(m_propagator.size()));
+            return xt::allclose(xt::sum(m_propagator), -1.0);
         }
 
         throw std::out_of_range("Unknown protocol");
@@ -617,7 +633,7 @@ public:
      * @param max_steps_is_error If `true`, throw `std::runtime_error` if `max_steps` is reached.
      * @return Number of iterations taken: `max_steps` corresponds to a failure to converge.
      */
-    size_t relaxAthermal(size_t max_steps = 1000000, bool max_steps_is_error = true)
+    size_t relaxAthermal(size_t max_steps = 10000000, bool max_steps_is_error = true)
     {
 
         for (size_t i = 0; i < max_steps; ++i) {
