@@ -266,6 +266,7 @@ protected:
         m_sigy_std = sigmay_std;
         m_sig = xt::ones_like(m_sigy_mu);
         m_epsp = xt::zeros_like(m_sigy_mu);
+        m_nfails = xt::zeros<size_t>(m_epsp.shape());
         m_sigy = xt::empty_like(m_sigy_mu);
         m_sig *= sigmabar;
 
@@ -284,6 +285,7 @@ protected:
 
         m_t = 0.0;
         m_epsp.fill(0.0);
+        m_nfails.fill(0);
     }
 
 public:
@@ -347,7 +349,16 @@ public:
      */
     const auto& shape() const
     {
-        return m_propagator.shape();
+        return m_epsp.shape();
+    }
+
+    /**
+     * @brief Return the size (`== prod(shape)`).
+     * @return Size
+     */
+    auto size() const
+    {
+        return m_epsp.size();
     }
 
     /**
@@ -402,6 +413,24 @@ public:
     const array_type::tensor<double, 2>& epsp() const
     {
         return m_epsp;
+    }
+
+    /**
+     * @brief Set the number of times each block failed.
+     * @param nfails Number of times each blocks failed.
+     */
+    void set_nfails(const array_type::tensor<size_t, 2>& nfails)
+    {
+        m_nfails = nfails;
+    }
+
+    /**
+     * @brief Get the number of times each block failed.
+     * @return Number of times each blocks failed.
+     */
+    const array_type::tensor<size_t, 2>& nfails() const
+    {
+        return m_nfails;
     }
 
     /**
@@ -554,6 +583,17 @@ public:
     }
 
     /**
+     * @brief Make `n` steps with SystemThermal::makeAthermalFailureStep.
+     * @param n Number of steps to take.
+     */
+    void makeAthermalFailureSteps(size_t n)
+    {
+        for (size_t i = 0; i < n; ++i) {
+            this->makeAthermalFailureStep();
+        }
+    }
+
+    /**
      * @brief Fail weakest block unstable and advance the time by one.
      *
      * @note If no block is unstable, nothing happens, and `-1` is returned.
@@ -588,6 +628,7 @@ public:
     {
         double dsig = m_sig.flat(idx) + m_gen.normal(0.0, 0.01);
 
+        m_nfails.flat(idx) += 1;
         m_epsp.flat(idx) -= dsig * m_propagator_origin;
         m_sigy.flat(idx) = m_gen.normal(m_sigy_mu.flat(idx), m_sigy_std.flat(idx));
 
@@ -685,6 +726,7 @@ protected:
     array_type::tensor<double, 2> m_sigy_mu; ///< Mean yield stress.
     array_type::tensor<double, 2> m_sigy_std; ///< Standard deviation of yield stress.
     array_type::tensor<double, 2> m_epsp; ///< Plastic strain.
+    array_type::tensor<size_t, 2> m_nfails; ///< Number of times a block failed.
     double m_t; ///< Time.
     double m_failure_rate; ///< Failure rate.
     double m_alpha; ///< Exponent characterising the shape of the potential.
