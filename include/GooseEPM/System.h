@@ -334,10 +334,10 @@ public:
         }
 
         if (protocol == "stress") {
-            return xt::allclose(xt::sum(m_propagator), 0.0);
+            return xt::allclose(xt::sum(m_propagator), 0);
         }
         else if (protocol == "strain") {
-            return xt::allclose(xt::sum(m_propagator), -1.0);
+            return xt::allclose(xt::sum(m_propagator), -1);
         }
 
         throw std::out_of_range("Unknown protocol");
@@ -665,9 +665,7 @@ public:
      * @brief Fail a block.
      *
      * -    Change the stress in the block.
-     * -    Stabilise the blocks.
      * -    Apply the propagator to change the stress in all 'surrounding' blocks.
-     * -    Check if there are any new unstable blocks.
      *
      * @param idx Flat index of the block to fail.
      */
@@ -691,11 +689,11 @@ public:
     }
 
     /**
-     * @brief Change the imposed shear such that one block fails in the direction of shear.
+     * @brief Change the imposed shear strain such that one block fails in the direction of shear.
      *
      * @warning
-     *      If you call this from a system that is not relaxed, the system will move in the
-     *      opposite direction than imposed.
+     *      If you call this from a system that is not relaxed (one or more blocks are unstable),
+     *      the system will move in the opposite direction than imposed.
      *
      * @param direction Select positive (+1) or negative (-1) direction.
      */
@@ -721,7 +719,7 @@ public:
      * @param max_steps_is_error If `true`, throw `std::runtime_error` if `max_steps` is reached.
      * @return Number of iterations taken: `max_steps` corresponds to a failure to converge.
      */
-    size_t relaxAthermal(size_t max_steps = 10000000, bool max_steps_is_error = true)
+    size_t relaxAthermal(size_t max_steps = 1e9, bool max_steps_is_error = true)
     {
 
         for (size_t i = 0; i < max_steps; ++i) {
@@ -746,7 +744,7 @@ public:
      * @param max_steps_is_error If `true`, throw `std::runtime_error` if `max_steps` is reached.
      * @return Number of iterations taken: `max_steps` corresponds to a failure to converge.
      */
-    size_t relaxWeakest(size_t max_steps = 1000000, bool max_steps_is_error = true)
+    size_t relaxWeakest(size_t max_steps = 1e9, bool max_steps_is_error = true)
     {
 
         for (size_t i = 0; i < max_steps; ++i) {

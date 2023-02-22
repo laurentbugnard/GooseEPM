@@ -186,14 +186,14 @@ PYBIND11_MODULE(_GooseEPM, mod)
             "relaxAthermal",
             &M::SystemAthermal::relaxAthermal,
             "Event-driven step",
-            py::arg("max_steps") = 1000000,
+            py::arg("max_steps") = size_t(1e9),
             py::arg("max_steps_is_error") = true);
 
         cls.def(
             "relaxWeakest",
             &M::SystemAthermal::relaxWeakest,
             "Event-driven step",
-            py::arg("max_steps") = 1000000,
+            py::arg("max_steps") = size_t(1e9),
             py::arg("max_steps_is_error") = true);
 
         cls.def("__repr__", [](const M::SystemAthermal&) { return "<GooseEPM.SystemAthermal>"; });
