@@ -93,6 +93,7 @@ PYBIND11_MODULE(_GooseEPM, mod)
         });
 
         cls.def_property_readonly("shape", &M::SystemAthermal::shape, "Shape");
+        cls.def_property_readonly("size", &M::SystemAthermal::size, "Size");
 
         cls.def(
             "propogator_follows_conventions",
@@ -109,6 +110,9 @@ PYBIND11_MODULE(_GooseEPM, mod)
             "State of the random number generator");
 
         cls.def_property_readonly("propagator", &M::SystemAthermal::propagator, "Propagator");
+
+        cls.def_property(
+            "nfails", &M::SystemAthermal::nfails, &M::SystemAthermal::set_nfails, "#fails");
 
         cls.def_property(
             "epsp", &M::SystemAthermal::epsp, &M::SystemAthermal::set_epsp, "Plastic strain");
@@ -154,6 +158,12 @@ PYBIND11_MODULE(_GooseEPM, mod)
             "makeAthermalFailureStep",
             &M::SystemAthermal::makeAthermalFailureStep,
             "Make an normal failure step");
+
+        cls.def(
+            "makeAthermalFailureSteps",
+            &M::SystemThermal::makeAthermalFailureSteps,
+            "Make `n` failure steps",
+            py::arg("n"));
 
         cls.def(
             "makeWeakestFailureStep",

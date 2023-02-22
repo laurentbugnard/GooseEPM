@@ -22,6 +22,8 @@ system = SystemAthermal(
     init_relax=True,
 )
 
+assert system.propogator_follows_conventions("strain")
+
 nstep = 1000
 sigma = np.empty([nstep])  # average stress
 epsp = np.empty([nstep])  # average plastic strain
@@ -30,7 +32,9 @@ epsp[0] = np.mean(system.epsp)
 
 for i in range(1, nstep):
     system.shiftImposedShear()
+    eps = np.mean(system.sigma + system.epsp)
     system.relaxAthermal()
+    assert np.allclose(eps, np.mean(system.sigma + system.epsp))
     sigma[i] = system.sigmabar
     epsp[i] = np.mean(system.epsp)
 
@@ -40,12 +44,11 @@ with h5py.File(base.parent / (base.stem + ".h5")) as file:
     assert np.allclose(file["sigma"][...], sigma)
 
 if plot:
-
     fig, axes = plt.subplots(ncols=2, figsize=(8 * 2, 6))
 
     ax = axes[0]
     ax.plot([0, 0.6], [0, 0.6], "r--")
-    ax.plot(sigma + epsp, sigma)
+    ax.plot(sigma + epsp, sigma, marker=".")
     ax.set_xlabel(r"$\gamma$")
     ax.set_ylabel(r"$\sigma$")
 

@@ -57,7 +57,6 @@ with h5py.File(base.parent / (base.stem + ".h5")) as file:
     assert np.allclose(file["sigma"][...], sigma)
 
 if plot:
-
     fig, axes = plt.subplots(ncols=2, figsize=(8 * 2, 6))
 
     ax = axes[0]

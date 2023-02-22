@@ -164,21 +164,38 @@ inline T reorganise_popagator(const T& propagator, const D& drow, const D& dcol)
  *
  * **Imposed stress**:
  *
- *  -   The propagator \f$ G_{ij} \f$ must follow \f$ \sum\limits_{ij} G_{ij} = 0 \f$ and
- *      \f$ G(\Delta i = 0, \Delta j = 0) = -1 \f$.
+ *  -   The propagator \f$ G \f$ must follow \f$ \sum\limits_{i = 1}^N G_i = 0 \f$ and
+ *      \f$ G(\Delta x = 0, \Delta y = 0) = -1 \f$.
  *      See SystemAthermal::propogator_follows_conventions.
  *
- * @note The average stress is not fixed internally. Consequently, numerical errors may accumulate.
+ * @note The average stress is not strictly fixed internally.
+ * Instead the average stress is simply not changed by the relaxation and the stress redistribution.
+ * Consequently, numerical errors may accumulate.
  * Use SystemAthermal::set_sigmabar to correct if needed.
  *
  * **Imposed strain**:
  *
- *  -   The propagator \f$ G_{ij} \f$ must follow \f$ \sum\limits_{ij} G_{ij} = - 1 / N \f$,
- *      with \f$ N \f$ the size of the propagator, and \f$ G(\Delta i = 0, \Delta j = 0) = -1 \f$.
+ *  -   The average strain
+ *      \f$ \bar{\epsilon}(t) \equiv 1 / N \sum\limits_{i = 1}^N \varepsilon_i (t) \f$
+ *      is fixed during relaxation.
+ *      Consequently, for each single relaxation, during a time interval \f$ \Delta t \f$,
+ *      \f$ \bar{\epsilon}(t + \Delta t) = \bar{\epsilon}(t) \f$.
+ *      The strain of each block
+ *      \f$ \varepsilon_i (t) = \varepsilon^p_i (t) + \sigma_i (t) / \mu \f$, with
+ *      \f$ \varepsilon^p_i \f$ the plastic strain and the shear modulus \f$ \mu \equiv 1 \f$.
+ *      For each individual relaxation, the plastic strain increment is non-zero only in the failing
+ *      block \f$ f \f$ and equal to
+ *      \f$ \Delta \varepsilon^p_f = G(\Delta x = 0, \Delta y = 0) \sigma_f / \mu \f$.
+ *      Since \f$ \sum\limits_{i = 1}^N \Delta \varepsilon_i = 0 \f$ it not now easy to find that
+ *      \f$ G(\Delta x = 0, \Delta y = 0) = \sum\limits_{i = 1}^N G_i \f$.
+ *
+ *  -   The propagator \f$ G \f$ must thus follow that \f$ \sum\limits_{i = 1}^N G_i = -1 \f$,
+ *      with \f$ G(\Delta x = 0, \Delta y = 0) = -1 \f$.
  *      See SystemAthermal::propogator_follows_conventions.
  *
- *  -   Driving proceeds by imposing the strain, that changes the stress through elasticity.
- *      To change the strain such that that the system just reaches the next yielding event,
+ *  -   Through this convention the strain is fixed during relaxation and stress redistribution.
+ *
+ *  -   To change the strain such that that the system just reaches the next yielding event,
  *      use SystemAthermal::shiftImposedShear.
  *
  * **Initialization**:
@@ -249,6 +266,7 @@ protected:
         m_sigy_std = sigmay_std;
         m_sig = xt::ones_like(m_sigy_mu);
         m_epsp = xt::zeros_like(m_sigy_mu);
+        m_nfails = xt::zeros<size_t>(m_epsp.shape());
         m_sigy = xt::empty_like(m_sigy_mu);
         m_sig *= sigmabar;
 
@@ -267,6 +285,7 @@ protected:
 
         m_t = 0.0;
         m_epsp.fill(0.0);
+        m_nfails.fill(0);
     }
 
 public:
@@ -315,11 +334,10 @@ public:
         }
 
         if (protocol == "stress") {
-            return xt::allclose(xt::mean(m_propagator), 0.0);
+            return xt::allclose(xt::sum(m_propagator), 0.0);
         }
         else if (protocol == "strain") {
-            return xt::allclose(
-                xt::mean(m_propagator), -1.0 / static_cast<double>(m_propagator.size()));
+            return xt::allclose(xt::sum(m_propagator), -1.0);
         }
 
         throw std::out_of_range("Unknown protocol");
@@ -331,7 +349,16 @@ public:
      */
     const auto& shape() const
     {
-        return m_propagator.shape();
+        return m_epsp.shape();
+    }
+
+    /**
+     * @brief Return the size (`== prod(shape)`).
+     * @return Size
+     */
+    auto size() const
+    {
+        return m_epsp.size();
     }
 
     /**
@@ -395,6 +422,24 @@ public:
     const array_type::tensor<double, 2>& epsp() const
     {
         return m_epsp;
+    }
+
+    /**
+     * @brief Set the number of times each block failed.
+     * @param nfails Number of times each blocks failed.
+     */
+    void set_nfails(const array_type::tensor<size_t, 2>& nfails)
+    {
+        m_nfails = nfails;
+    }
+
+    /**
+     * @brief Get the number of times each block failed.
+     * @return Number of times each blocks failed.
+     */
+    const array_type::tensor<size_t, 2>& nfails() const
+    {
+        return m_nfails;
     }
 
     /**
@@ -585,6 +630,17 @@ public:
     }
 
     /**
+     * @brief Make `n` steps with SystemThermal::makeAthermalFailureStep.
+     * @param n Number of steps to take.
+     */
+    void makeAthermalFailureSteps(size_t n)
+    {
+        for (size_t i = 0; i < n; ++i) {
+            this->makeAthermalFailureStep();
+        }
+    }
+
+    /**
      * @brief Fail weakest block unstable and advance the time by one.
      *
      * @note If no block is unstable, nothing happens, and `-1` is returned.
@@ -619,6 +675,7 @@ public:
     {
         double dsig = m_sig.flat(idx) + m_gen.normal(0.0, 0.01);
 
+        m_nfails.flat(idx) += 1;
         m_epsp.flat(idx) -= dsig * m_propagator_origin;
         m_sigy.flat(idx) = m_gen.normal(m_sigy_mu.flat(idx), m_sigy_std.flat(idx));
 
@@ -664,7 +721,7 @@ public:
      * @param max_steps_is_error If `true`, throw `std::runtime_error` if `max_steps` is reached.
      * @return Number of iterations taken: `max_steps` corresponds to a failure to converge.
      */
-    size_t relaxAthermal(size_t max_steps = 1000000, bool max_steps_is_error = true)
+    size_t relaxAthermal(size_t max_steps = 10000000, bool max_steps_is_error = true)
     {
 
         for (size_t i = 0; i < max_steps; ++i) {
@@ -716,6 +773,7 @@ protected:
     array_type::tensor<double, 2> m_sigy_mu; ///< Mean yield stress.
     array_type::tensor<double, 2> m_sigy_std; ///< Standard deviation of yield stress.
     array_type::tensor<double, 2> m_epsp; ///< Plastic strain.
+    array_type::tensor<size_t, 2> m_nfails; ///< Number of times a block failed.
     double m_t; ///< Time.
     double m_failure_rate; ///< Failure rate.
     double m_alpha; ///< Exponent characterising the shape of the potential.
