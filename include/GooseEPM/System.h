@@ -697,7 +697,7 @@ public:
      *
      * @param direction Select positive (+1) or negative (-1) direction.
      */
-    void shiftImposedShear(int direction = 1)
+    double shiftImposedShear(int direction = 1)
     {
         double dsig;
 
@@ -709,6 +709,8 @@ public:
         }
 
         m_sig += dsig;
+
+        return dsig;
     }
 
     /**
