@@ -696,6 +696,7 @@ public:
      *      the system will move in the opposite direction than imposed.
      *
      * @param direction Select positive (+1) or negative (-1) direction.
+     * @return The stress increment.
      */
     double shiftImposedShear(int direction = 1)
     {
